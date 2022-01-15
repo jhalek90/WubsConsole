@@ -26,6 +26,9 @@ function wubsConsoleInit(){
 	wubsConsoleCallHistory = ds_list_create(); // list of previously ran commands
 	wubsConsoleCallHistoryIndex = -1;
 	
+	// Map with name->callback.
+	wubsConsoleCommands = ds_map_create();
+	
 	wubsConsoleEnabled=false;//is the console open?
 
 	//size adjustments can be made here
@@ -37,6 +40,8 @@ function wubsConsoleInit(){
 	wubsConsoleCursorFlash=false;
 	wubsConsoleCursorTimer=0;
 	wubsConsoleCursorDelay=30;
+	
+	wubsConsoleRegisterBuiltinCommands();
 }
 
 function wubsConsoleIsEnabled(){
@@ -111,6 +116,15 @@ function wubsConsoleAddCommand(_text){
 	wubsConsoleCallHistoryIndex = -1;
 
 	wubsConsoleHandleCommand(_text);
+}
+
+function wubsConsoleRegisterCommand(_name, _callback){
+	if (ds_map_exists(wubsConsoleCommands, _name)){
+		show_error("Tried to redefine already define command `" + _name  + "`", true);
+		return;
+	}
+	
+	ds_map_add(wubsConsoleCommands, _name, _callback);
 }
 
 function wubsConsoleDraw(_x,_y){
@@ -202,141 +216,185 @@ function wubsConsoleHandleCommand(_command){
 		wubsConsoleAddLog("&5Spawned &8"+string(_amount)+" &3"+string(_obj))//log to console
 	}
 	*/
+	if (_command == "") return;
+		
+	var _arguments = ds_list_create();
 	
-	try{
 	#region get command and arguments
-		if _command == ""{
-			exit;
-		}
-		_command+=" "//add a trailing space
-		var _arguments=ds_list_create()
+		try{
+			_command+=" "//add a trailing space
+			
+			var _remainingCommand=_command
 	
-		var _remainingCommand=_command
-	
-		var _firstSpace=string_pos(" ",_remainingCommand);
-		if _firstSpace>0{
-			var _thisCommand=string_copy(_remainingCommand,0,_firstSpace-1);
-			_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
-		
-		
-			do{
-				_firstSpace=string_pos(" ",_remainingCommand);
-				ds_list_add(_arguments,string_copy(_remainingCommand,0,_firstSpace-1));
+			var _firstSpace=string_pos(" ",_remainingCommand);
+			if _firstSpace>0{
+				var _thisCommand=string_copy(_remainingCommand,0,_firstSpace-1);
 				_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
-			}until(string_length(_remainingCommand)=0)
 		
 		
-		}else{
-			_thisCommand=_command;
+				do{
+					_firstSpace=string_pos(" ",_remainingCommand);
+					ds_list_add(_arguments,string_copy(_remainingCommand,0,_firstSpace-1));
+					_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
+				}until(string_length(_remainingCommand)=0)
+		
+		
+			}else{
+				_thisCommand=_command;
+			}
+		}catch(e){
+			show_debug_message(e);
 		}
-	
+		
 	#endregion
 
-	#region command Help
-		if (_thisCommand == "help") or (_thisCommand == "list"){
-			wubsConsoleAddLog("&6Type commands into the console to execute code");
-			wubsConsoleAddLog("");
-			wubsConsoleAddLog("&1avalible commands:");
-			wubsConsoleAddLog("    &1-&5help");
-			wubsConsoleAddLog("    &1-&5quit");
-			wubsConsoleAddLog("    &1-&5fullscreen");
-			wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
-			wubsConsoleAddLog("");
-			wubsConsoleAddLog("&1created by: &8Wubs");
-			wubsConsoleAddLog("&7https://wubsgames.com");
-			exit;
-		}
-	#endregion
+	wubsConsoleTryExecuteCommand(_thisCommand, _arguments);
 	
-	#region command Echo
-		if (_thisCommand == "echo") or (_thisCommand == "say") or (_thisCommand == "repeat"){
-			var _echo=""
-			for (var _a=0; _a<ds_list_size(_arguments); _a++){
-				_echo+=_arguments[| _a];
-				_echo +=" "
-			}
-			wubsConsoleAddLog(_echo);
-			exit;
+	ds_list_destroy(_arguments);
+}
+
+#region Private.
+
+#macro WS_CMD_EXEC_WRAP_EXC true // If true, will wrap execution in to the try/catch block, showing debug message if there is any error.
+								 // I think, this is should be disabled, but if you want.
+function wubsConsoleTryExecuteCommand(_name, _arguments){
+	// @description Tries to execute command, or returns false if can`t.
+	// @param {string} _name Name of the command to execute.
+	// @param {ds_list} _arguments List of arguments to send.
+	// @returns {bool} Executed or not.
+	
+	// Try get callback.
+	var _callback = ds_map_find_value(wubsConsoleCommands, _name);
 		
-		}
-	#endregion
+	if is_undefined(_callback){
+		// Not found command -> error.
+		wubsConsoleAddLog("&1Unknown command: '&2" + string(_name) + "&1' use '&3help&1' for a list of commands");
+		return false;
+	}
 		
-	#region command Clear
-		if (_thisCommand="clear"){
-			ds_list_clear(wubsConsoleLog)
-			exit
+	// Execute command.
+	var _response = undefined;
+	if (WS_CMD_EXEC_WRAP_EXC){
+		try{
+			_response = _callback(_arguments);
+		}catch(exception){
+			show_debug_message(exception);
 		}
-	#endregion
+	}else{
+		_response = _callback(_arguments);
+	}
 		
-	#region command Exit
-		if (_thisCommand="exit") or (_thisCommand="quit"){
-			wubsConsoleDisable();
-			exit
-		}
-	#endregion
-	
-	#region command Add
-		if (_thisCommand="add") or (_thisCommand="sum"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a+_b));
-			exit
-		}
-	#endregion
-	
-	#region command sub
-		if (_thisCommand="sub"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a-_b));
-			exit
-		}
-	#endregion
-	
-	#region command multiply
-		if (_thisCommand="mult"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a*_b));
-			exit
-		}
-	#endregion
-	
-	#region command divide
-		if (_thisCommand="div"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a/_b));
-			exit
-		}
-	#endregion
-	
-	#region command fps
-		if (_thisCommand="fps"){
-			wubsConsoleAddLog("fps: "+string(fps));
-			wubsConsoleAddLog("fps real: "+string(fps_real));
-			exit
-		}
-	#endregion
-		
-	#region command fullscreen
-		if (_thisCommand="fullscreen"){
-			window_set_fullscreen(!window_get_fullscreen())
-			exit
-		}
-	#endregion
-	
-	#region default response
-		ds_list_destroy(_arguments)
-		wubsConsoleAddLog("&1Unknown command: '&2"+string(_command)+"&1' use '&3help&1' for a list of commands");
-	#endregion
-	}catch(e){
-		show_debug_message(e);
+	if not is_undefined(_response){
+		// If callback is returned something, add log.
+		wubsConsoleAddLog(string(_response));
 	}
 }
-	
 
+
+function wubsConsoleRegisterBuiltinCommands(){
+	// @descripion Registers builtin commands.
+	
+	// ADD (+).
+	wubsConsoleRegisterCommand("add", __wubsConsoleBuiltinCommandBinaryAdd);
+	wubsConsoleRegisterCommand("sum", __wubsConsoleBuiltinCommandBinaryAdd);
+	// SUB (-).
+	wubsConsoleRegisterCommand("sub", __wubsConsoleBuiltinCommandBinarySub);
+	// MULT (*)
+	wubsConsoleRegisterCommand("mult", __wubsConsoleBuiltinCommandBinaryMul);
+	// DIV (/).
+	wubsConsoleRegisterCommand("div", __wubsConsoleBuiltinCommandBinaryDiv);
+
+	// HELP.
+	wubsConsoleRegisterCommand("help", __wubsConsoleBuiltinCommandHelp);
+	wubsConsoleRegisterCommand("list", __wubsConsoleBuiltinCommandHelp);
+	// CLEAR.
+	wubsConsoleRegisterCommand("clear", __wubsConsoleBuiltinCommandClear);
+	// ECHO.
+	wubsConsoleRegisterCommand("echo", __wubsConsoleBuiltinCommandEcho);
+	wubsConsoleRegisterCommand("say", __wubsConsoleBuiltinCommandEcho);
+	wubsConsoleRegisterCommand("repeat", __wubsConsoleBuiltinCommandEcho);
+	// EXIT.
+	wubsConsoleRegisterCommand("exit", __wubsConsoleBuiltinCommandExit);
+	// FPS.
+	wubsConsoleRegisterCommand("fps", __wubsConsoleBuiltinCommandFps);
+	// FULLSCREEN.
+	wubsConsoleRegisterCommand("fullscreen", __wubsConsoleBuiltinCommandFullscreen);
+}
+
+#endregion
+
+#region Built-in commands.
+
+#region Binary operations.
+
+function __wubsConsoleBuiltinCommandBinaryDiv(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a / _operand_b;
+}
+
+function __wubsConsoleBuiltinCommandBinaryMul(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a * _operand_b;
+}
+
+function __wubsConsoleBuiltinCommandBinarySub(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a - _operand_b;
+}
+function __wubsConsoleBuiltinCommandBinaryAdd(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a + _operand_b;
+}
+
+#endregion
+
+function __wubsConsoleBuiltinCommandEcho(_arguments){
+	var _echo_buffer = "";
+	
+	for (var i = 0; i < ds_list_size(_arguments); i++){
+		_echo_buffer += _arguments[| i];
+		_echo_buffer += " ";
+	}
+	
+	return _echo_buffer; 
+}
+	
+function __wubsConsoleBuiltinCommandFps(){
+	wubsConsoleAddLog("fps: " + string(fps));
+	wubsConsoleAddLog("fps_real: " + string(fps_real));
+}
+
+function __wubsConsoleBuiltinCommandFullscreen(){
+	window_set_fullscreen(!window_get_fullscreen());
+}
+
+function __wubsConsoleBuiltinCommandHelp(){
+	wubsConsoleAddLog("&6Type commands into the console to execute code");
+	wubsConsoleAddLog("");
+	wubsConsoleAddLog("&1avalible commands:");
+	wubsConsoleAddLog("    &1-&5help");
+	wubsConsoleAddLog("    &1-&5quit");
+	wubsConsoleAddLog("    &1-&5fullscreen");
+	wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
+	wubsConsoleAddLog("");
+	wubsConsoleAddLog("&1created by: &8Wubs");
+	wubsConsoleAddLog("&7https://wubsgames.com");
+}
+
+function __wubsConsoleBuiltinCommandClear(){
+	ds_list_clear(wubsConsoleLog);
+}
+
+function __wubsConsoleBuiltinCommandExit(){
+	wubsConsoleDisable();
+}
+
+#endregion
