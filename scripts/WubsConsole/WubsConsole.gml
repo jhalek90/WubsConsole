@@ -127,80 +127,6 @@ function wubsConsoleRegisterCommand(_name, _callback){
 	ds_map_add(wubsConsoleCommands, _name, _callback);
 }
 
-function wubsConsoleRegisterBuiltinCommands(){
-	
-	
-	// list
-	wubsConsoleRegisterCommand("help", function (_arguments){
-		wubsConsoleAddLog("&6Type commands into the console to execute code");
-		wubsConsoleAddLog("");
-		wubsConsoleAddLog("&1avalible commands:");
-		wubsConsoleAddLog("    &1-&5help");
-		wubsConsoleAddLog("    &1-&5quit");
-		wubsConsoleAddLog("    &1-&5fullscreen");
-		wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
-		wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
-		wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
-		wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
-		wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
-		wubsConsoleAddLog("");
-		wubsConsoleAddLog("&1created by: &8Wubs");
-		wubsConsoleAddLog("&7https://wubsgames.com");
-	})
-	
-	// say repeat.
-	wubsConsoleRegisterCommand("echo", function (_arguments){
-		var _echo=""
-		for (var _a=0; _a<ds_list_size(_arguments); _a++){
-			_echo+=_arguments[| _a];
-			_echo +=" "
-		}
-		return _echo; 
-	})
-	
-	wubsConsoleRegisterCommand("clear", function (_arguments){
-		ds_list_clear(wubsConsoleLog);
-	})
-
-	wubsConsoleRegisterCommand("exit", function (_arguments){
-		wubsConsoleDisable();
-	})
-		
-	// sum
-	wubsConsoleRegisterCommand("add", function (_arguments){
-		var _a=real(_arguments[| 0])
-		var _b=real(_arguments[| 1])
-		return _a+_b;
-	})
-	
-	wubsConsoleRegisterCommand("sub", function (_arguments){
-		var _a=real(_arguments[| 0])
-		var _b=real(_arguments[| 1])
-		return _a-_b;
-	})
-	
-	wubsConsoleRegisterCommand("mult", function (_arguments){
-		var _a=real(_arguments[| 0])
-		var _b=real(_arguments[| 1])
-		return _a*_b;
-	})
-	
-	wubsConsoleRegisterCommand("div", function (_arguments){
-		var _a=real(_arguments[| 0])
-		var _b=real(_arguments[| 1])
-		return _a/_b;
-	})
-	
-	wubsConsoleRegisterCommand("fps", function (_arguments){
-		wubsConsoleAddLog("fps: "+string(fps));
-		wubsConsoleAddLog("fps real: "+string(fps_real));
-	})
-	
-	wubsConsoleRegisterCommand("fullscreen", function (_arguments){
-		window_set_fullscreen(!window_get_fullscreen())
-	})
-}
-
 function wubsConsoleDraw(_x,_y){
 	if !wubsConsoleIsEnabled(){exit}
 	draw_set_font(fntWubsConsolas)
@@ -327,6 +253,8 @@ function wubsConsoleHandleCommand(_command){
 	ds_list_destroy(_arguments);
 }
 
+#region Private.
+
 #macro WS_CMD_EXEC_WRAP_EXC true // If true, will wrap execution in to the try/catch block, showing debug message if there is any error.
 								 // I think, this is should be disabled, but if you want.
 function wubsConsoleTryExecuteCommand(_name, _arguments){
@@ -361,3 +289,112 @@ function wubsConsoleTryExecuteCommand(_name, _arguments){
 		wubsConsoleAddLog(string(_response));
 	}
 }
+
+
+function wubsConsoleRegisterBuiltinCommands(){
+	// @descripion Registers builtin commands.
+	
+	// ADD (+).
+	wubsConsoleRegisterCommand("add", __wubsConsoleBuiltinCommandBinaryAdd);
+	wubsConsoleRegisterCommand("sum", __wubsConsoleBuiltinCommandBinaryAdd);
+	// SUB (-).
+	wubsConsoleRegisterCommand("sub", __wubsConsoleBuiltinCommandBinarySub);
+	// MULT (*)
+	wubsConsoleRegisterCommand("mult", __wubsConsoleBuiltinCommandBinaryMul);
+	// DIV (/).
+	wubsConsoleRegisterCommand("div", __wubsConsoleBuiltinCommandBinaryDiv);
+
+	// HELP.
+	wubsConsoleRegisterCommand("help", __wubsConsoleBuiltinCommandHelp);
+	wubsConsoleRegisterCommand("list", __wubsConsoleBuiltinCommandHelp);
+	// CLEAR.
+	wubsConsoleRegisterCommand("clear", __wubsConsoleBuiltinCommandClear);
+	// ECHO.
+	wubsConsoleRegisterCommand("echo", __wubsConsoleBuiltinCommandEcho);
+	wubsConsoleRegisterCommand("say", __wubsConsoleBuiltinCommandEcho);
+	wubsConsoleRegisterCommand("repeat", __wubsConsoleBuiltinCommandEcho);
+	// EXIT.
+	wubsConsoleRegisterCommand("exit", __wubsConsoleBuiltinCommandExit);
+	// FPS.
+	wubsConsoleRegisterCommand("fps", __wubsConsoleBuiltinCommandFps);
+	// FULLSCREEN.
+	wubsConsoleRegisterCommand("fullscreen", __wubsConsoleBuiltinCommandFullscreen);
+}
+
+#endregion
+
+#region Built-in commands.
+
+#region Binary operations.
+
+function __wubsConsoleBuiltinCommandBinaryDiv(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a / _operand_b;
+}
+
+function __wubsConsoleBuiltinCommandBinaryMul(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a * _operand_b;
+}
+
+function __wubsConsoleBuiltinCommandBinarySub(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a - _operand_b;
+}
+function __wubsConsoleBuiltinCommandBinaryAdd(_arguments){
+	var _operand_a = real(_arguments[| 0]);
+	var _operand_b = real(_arguments[| 1]);
+	return _operand_a + _operand_b;
+}
+
+#endregion
+
+function __wubsConsoleBuiltinCommandEcho(_arguments){
+	var _echo_buffer = "";
+	
+	for (var i = 0; i < ds_list_size(_arguments); i++){
+		_echo_buffer += _arguments[| i];
+		_echo_buffer += " ";
+	}
+	
+	return _echo_buffer; 
+}
+	
+function __wubsConsoleBuiltinCommandFps(){
+	wubsConsoleAddLog("fps: " + string(fps));
+	wubsConsoleAddLog("fps_real: " + string(fps_real));
+}
+
+function __wubsConsoleBuiltinCommandFullscreen(){
+	window_set_fullscreen(!window_get_fullscreen());
+}
+
+function __wubsConsoleBuiltinCommandHelp(){
+	wubsConsoleAddLog("&6Type commands into the console to execute code");
+	wubsConsoleAddLog("");
+	wubsConsoleAddLog("&1avalible commands:");
+	wubsConsoleAddLog("    &1-&5help");
+	wubsConsoleAddLog("    &1-&5quit");
+	wubsConsoleAddLog("    &1-&5fullscreen");
+	wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
+	wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
+	wubsConsoleAddLog("");
+	wubsConsoleAddLog("&1created by: &8Wubs");
+	wubsConsoleAddLog("&7https://wubsgames.com");
+}
+
+function __wubsConsoleBuiltinCommandClear(){
+	ds_list_clear(wubsConsoleLog);
+}
+
+function __wubsConsoleBuiltinCommandExit(){
+	wubsConsoleDisable();
+}
+
+#endregion
