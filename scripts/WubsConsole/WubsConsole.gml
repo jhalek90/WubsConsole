@@ -290,56 +290,74 @@ function wubsConsoleHandleCommand(_command){
 		wubsConsoleAddLog("&5Spawned &8"+string(_amount)+" &3"+string(_obj))//log to console
 	}
 	*/
+	if (_command == "") return;
+		
+	var _arguments = ds_list_create();
 	
-	try{
 	#region get command and arguments
-		if _command == ""{
-			exit;
-		}
-		_command+=" "//add a trailing space
-		var _arguments=ds_list_create()
+		try{
+			_command+=" "//add a trailing space
+			
+			var _remainingCommand=_command
 	
-		var _remainingCommand=_command
-	
-		var _firstSpace=string_pos(" ",_remainingCommand);
-		if _firstSpace>0{
-			var _thisCommand=string_copy(_remainingCommand,0,_firstSpace-1);
-			_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
-		
-		
-			do{
-				_firstSpace=string_pos(" ",_remainingCommand);
-				ds_list_add(_arguments,string_copy(_remainingCommand,0,_firstSpace-1));
+			var _firstSpace=string_pos(" ",_remainingCommand);
+			if _firstSpace>0{
+				var _thisCommand=string_copy(_remainingCommand,0,_firstSpace-1);
 				_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
-			}until(string_length(_remainingCommand)=0)
 		
 		
-		}else{
-			_thisCommand=_command;
+				do{
+					_firstSpace=string_pos(" ",_remainingCommand);
+					ds_list_add(_arguments,string_copy(_remainingCommand,0,_firstSpace-1));
+					_remainingCommand=string_copy(_remainingCommand,_firstSpace+1,string_length(_remainingCommand)-1);
+				}until(string_length(_remainingCommand)=0)
+		
+		
+			}else{
+				_thisCommand=_command;
+			}
+		}catch(e){
+			show_debug_message(e);
 		}
-	
+		
 	#endregion
 
-	// Try get callback.
-	var _callback = ds_map_find_value(wubsConsoleCommands, _thisCommand);
-	if is_undefined(_callback){
-		// Not found command -> error.
-		wubsConsoleAddLog("&1Unknown command: '&2"+string(_command)+"&1' use '&3help&1' for a list of commands");
-	}else{
-		var _response = _callback(_arguments);
-		
-		if not is_undefined(_response){
-			// If callback is returned something, add log.
-			wubsConsoleAddLog(string(_response));
-		}
-	}
+	wubsConsoleTryExecuteCommand(_thisCommand, _arguments);
 	
 	ds_list_destroy(_arguments);
-
-	}catch(e){
-		show_debug_message(e);
-	}
 }
 
+#macro WS_CMD_EXEC_WRAP_EXC true // If true, will wrap execution in to the try/catch block, showing debug message if there is any error.
+								 // I think, this is should be disabled, but if you want.
+function wubsConsoleTryExecuteCommand(_name, _arguments){
+	// @description Tries to execute command, or returns false if can`t.
+	// @param {string} _name Name of the command to execute.
+	// @param {ds_list} _arguments List of arguments to send.
+	// @returns {bool} Executed or not.
 	
-
+	// Try get callback.
+	var _callback = ds_map_find_value(wubsConsoleCommands, _name);
+		
+	if is_undefined(_callback){
+		// Not found command -> error.
+		wubsConsoleAddLog("&1Unknown command: '&2" + string(_name) + "&1' use '&3help&1' for a list of commands");
+		return false;
+	}
+		
+	// Execute command.
+	var _response = undefined;
+	if (WS_CMD_EXEC_WRAP_EXC){
+		try{
+			_response = _callback(_arguments);
+		}catch(exception){
+			show_debug_message(exception);
+		}
+	}else{
+		_response = _callback(_arguments);
+	}
+		
+	if not is_undefined(_response){
+		// If callback is returned something, add log.
+		wubsConsoleAddLog(string(_response));
+	}
+}
