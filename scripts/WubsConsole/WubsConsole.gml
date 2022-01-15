@@ -23,7 +23,8 @@
 
 function wubsConsoleInit(){
 	wubsConsoleLog=ds_list_create();//some data structures to hold the log
-	wubsConsoleCommands=ds_list_create();//list of previously ran commands
+	wubsConsoleCallHistory = ds_list_create(); // list of previously ran commands
+	wubsConsoleCallHistoryIndex = -1;
 	
 	wubsConsoleEnabled=false;//is the console open?
 
@@ -74,19 +75,29 @@ function wubsConsoleStep(_key,_keyClose){
 			
 			wubsConsoleAddLog(keyboard_string);
 			wubsConsoleAddCommand(keyboard_string);
+
 			
 			keyboard_string="";
 		}
 		
-		if keyboard_check_pressed(vk_up){
+		var _history_move_direction = keyboard_check_pressed(vk_up) - keyboard_check_pressed(vk_down);
+		if _history_move_direction != 0{
 			
-			keyboard_string=wubsConsoleCommands[| ds_list_size(wubsConsoleCommands)-1]
+			if (_history_move_direction == -1 and wubsConsoleCallHistoryIndex == -1){
+				// Move down when there is last element.
+				keyboard_string="";
+			}else{
+				// Move in history.
+				var _call_history_size = ds_list_size(wubsConsoleCallHistory);
+				wubsConsoleCallHistoryIndex += _history_move_direction;
+				wubsConsoleCallHistoryIndex = clamp(wubsConsoleCallHistoryIndex, -1, _call_history_size - 1);
+				
+				// Get previous command from the history.
+				var _previous_command = wubsConsoleCallHistory[| (_call_history_size - 1 - wubsConsoleCallHistoryIndex)];
+				keyboard_string = _previous_command;
+			}
+			
 		}
-		
-		if keyboard_check_pressed(vk_down){
-			keyboard_string=""
-		}
-		
 	}
 }
 
@@ -95,7 +106,10 @@ function wubsConsoleAddLog(_text){
 }
 	
 function wubsConsoleAddCommand(_text){
-	ds_list_add(wubsConsoleCommands,_text);
+	ds_list_add(wubsConsoleCallHistory,_text);
+	// reset history index.
+	wubsConsoleCallHistoryIndex = -1;
+
 	wubsConsoleHandleCommand(_text);
 }
 
