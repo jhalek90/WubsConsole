@@ -26,6 +26,9 @@ function wubsConsoleInit(){
 	wubsConsoleCallHistory = ds_list_create(); // list of previously ran commands
 	wubsConsoleCallHistoryIndex = -1;
 	
+	// Map with name->callback.
+	wubsConsoleCommands = ds_map_create();
+	
 	wubsConsoleEnabled=false;//is the console open?
 
 	//size adjustments can be made here
@@ -37,6 +40,8 @@ function wubsConsoleInit(){
 	wubsConsoleCursorFlash=false;
 	wubsConsoleCursorTimer=0;
 	wubsConsoleCursorDelay=30;
+	
+	wubsConsoleRegisterBuiltinCommands();
 }
 
 function wubsConsoleIsEnabled(){
@@ -111,6 +116,89 @@ function wubsConsoleAddCommand(_text){
 	wubsConsoleCallHistoryIndex = -1;
 
 	wubsConsoleHandleCommand(_text);
+}
+
+function wubsConsoleRegisterCommand(_name, _callback){
+	if (ds_map_exists(wubsConsoleCommands, _name)){
+		show_error("Tried to redefine already define command `" + _name  + "`", true);
+		return;
+	}
+	
+	ds_map_add(wubsConsoleCommands, _name, _callback);
+}
+
+function wubsConsoleRegisterBuiltinCommands(){
+	
+	
+	// list
+	wubsConsoleRegisterCommand("help", function (_arguments){
+		wubsConsoleAddLog("&6Type commands into the console to execute code");
+		wubsConsoleAddLog("");
+		wubsConsoleAddLog("&1avalible commands:");
+		wubsConsoleAddLog("    &1-&5help");
+		wubsConsoleAddLog("    &1-&5quit");
+		wubsConsoleAddLog("    &1-&5fullscreen");
+		wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
+		wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
+		wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
+		wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
+		wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
+		wubsConsoleAddLog("");
+		wubsConsoleAddLog("&1created by: &8Wubs");
+		wubsConsoleAddLog("&7https://wubsgames.com");
+	})
+	
+	// say repeat.
+	wubsConsoleRegisterCommand("echo", function (_arguments){
+		var _echo=""
+		for (var _a=0; _a<ds_list_size(_arguments); _a++){
+			_echo+=_arguments[| _a];
+			_echo +=" "
+		}
+		return _echo; 
+	})
+	
+	wubsConsoleRegisterCommand("clear", function (_arguments){
+		ds_list_clear(wubsConsoleLog);
+	})
+
+	wubsConsoleRegisterCommand("exit", function (_arguments){
+		wubsConsoleDisable();
+	})
+		
+	// sum
+	wubsConsoleRegisterCommand("add", function (_arguments){
+		var _a=real(_arguments[| 0])
+		var _b=real(_arguments[| 1])
+		return _a+_b;
+	})
+	
+	wubsConsoleRegisterCommand("sub", function (_arguments){
+		var _a=real(_arguments[| 0])
+		var _b=real(_arguments[| 1])
+		return _a-_b;
+	})
+	
+	wubsConsoleRegisterCommand("mult", function (_arguments){
+		var _a=real(_arguments[| 0])
+		var _b=real(_arguments[| 1])
+		return _a*_b;
+	})
+	
+	wubsConsoleRegisterCommand("div", function (_arguments){
+		var _a=real(_arguments[| 0])
+		var _b=real(_arguments[| 1])
+		return _a/_b;
+	})
+	
+	wubsConsoleRegisterCommand("fps", function (_arguments){
+		wubsConsoleAddLog("fps: "+string(fps));
+		wubsConsoleAddLog("fps real: "+string(fps_real));
+	})
+	
+	wubsConsoleRegisterCommand("fullscreen", function (_arguments){
+		window_set_fullscreen(!window_get_fullscreen())
+	})
 }
 
 function wubsConsoleDraw(_x,_y){
@@ -232,111 +320,26 @@ function wubsConsoleHandleCommand(_command){
 	
 	#endregion
 
-	#region command Help
-		if (_thisCommand == "help") or (_thisCommand == "list"){
-			wubsConsoleAddLog("&6Type commands into the console to execute code");
-			wubsConsoleAddLog("");
-			wubsConsoleAddLog("&1avalible commands:");
-			wubsConsoleAddLog("    &1-&5help");
-			wubsConsoleAddLog("    &1-&5quit");
-			wubsConsoleAddLog("    &1-&5fullscreen");
-			wubsConsoleAddLog("    &1-&5add &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5sub &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5mult &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("    &1-&5div &4[&1a&4] &4[&1b&4]");
-			wubsConsoleAddLog("&6You can add new commands in &3wubsConsoleHandleCommand&6()&1;");
-			wubsConsoleAddLog("");
-			wubsConsoleAddLog("&1created by: &8Wubs");
-			wubsConsoleAddLog("&7https://wubsgames.com");
-			exit;
-		}
-	#endregion
-	
-	#region command Echo
-		if (_thisCommand == "echo") or (_thisCommand == "say") or (_thisCommand == "repeat"){
-			var _echo=""
-			for (var _a=0; _a<ds_list_size(_arguments); _a++){
-				_echo+=_arguments[| _a];
-				_echo +=" "
-			}
-			wubsConsoleAddLog(_echo);
-			exit;
-		
-		}
-	#endregion
-		
-	#region command Clear
-		if (_thisCommand="clear"){
-			ds_list_clear(wubsConsoleLog)
-			exit
-		}
-	#endregion
-		
-	#region command Exit
-		if (_thisCommand="exit") or (_thisCommand="quit"){
-			wubsConsoleDisable();
-			exit
-		}
-	#endregion
-	
-	#region command Add
-		if (_thisCommand="add") or (_thisCommand="sum"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a+_b));
-			exit
-		}
-	#endregion
-	
-	#region command sub
-		if (_thisCommand="sub"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a-_b));
-			exit
-		}
-	#endregion
-	
-	#region command multiply
-		if (_thisCommand="mult"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a*_b));
-			exit
-		}
-	#endregion
-	
-	#region command divide
-		if (_thisCommand="div"){
-			var _a=real(_arguments[| 0])
-			var _b=real(_arguments[| 1])
-			wubsConsoleAddLog(string(_a/_b));
-			exit
-		}
-	#endregion
-	
-	#region command fps
-		if (_thisCommand="fps"){
-			wubsConsoleAddLog("fps: "+string(fps));
-			wubsConsoleAddLog("fps real: "+string(fps_real));
-			exit
-		}
-	#endregion
-		
-	#region command fullscreen
-		if (_thisCommand="fullscreen"){
-			window_set_fullscreen(!window_get_fullscreen())
-			exit
-		}
-	#endregion
-	
-	#region default response
-		ds_list_destroy(_arguments)
+	// Try get callback.
+	var _callback = ds_map_find_value(wubsConsoleCommands, _thisCommand);
+	if is_undefined(_callback){
+		// Not found command -> error.
 		wubsConsoleAddLog("&1Unknown command: '&2"+string(_command)+"&1' use '&3help&1' for a list of commands");
-	#endregion
+	}else{
+		var _response = _callback(_arguments);
+		
+		if not is_undefined(_response){
+			// If callback is returned something, add log.
+			wubsConsoleAddLog(string(_response));
+		}
+	}
+	
+	ds_list_destroy(_arguments);
+
 	}catch(e){
 		show_debug_message(e);
 	}
 }
+
 	
 
